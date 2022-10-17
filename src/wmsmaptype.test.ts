@@ -31,7 +31,7 @@ beforeEach(() => {
 });
 
 test("xyzToBounds is correct", () => {
-  expect(xyzToBounds(0, 0, 0)).toEqual([
+  expect(xyzToBounds(0, 0, 0, 256)).toEqual([
     -EPSG_3857_EXTENT,
     -EPSG_3857_EXTENT,
     EPSG_3857_EXTENT,

@@ -46,12 +46,12 @@ const ORIG_Y = EPSG_3857_EXTENT; // y starts from top
  * @param zoom
  * @returns {number[]} minx, miny, maxx, maxy
  */
-function xyzToBounds(x: number, y: number, zoom: number): number[] {
-  const tileSize = (EPSG_3857_EXTENT * 2) / Math.pow(2, zoom);
-  const minx = ORIG_X + x * tileSize;
-  const maxx = ORIG_X + (x + 1) * tileSize;
-  const miny = ORIG_Y - (y + 1) * tileSize;
-  const maxy = ORIG_Y - y * tileSize;
+function xyzToBounds(x: number, y: number, zoom: number, tileSize: number): number[] {
+  const wmsTileSize = EPSG_3857_EXTENT * tileSize / (1 << zoom + 7);
+  const minx = ORIG_X + x * wmsTileSize;
+  const maxx = ORIG_X + (x + 1) * wmsTileSize;
+  const miny = ORIG_Y - (y + 1) * wmsTileSize;
+  const maxy = ORIG_Y - y * wmsTileSize;
   return [minx, miny, maxx, maxy];
 }
 
@@ -69,6 +69,7 @@ interface WmsMapTypeOptions {
   alt?: string;
   minZoom?: number;
   opacity?: number;
+  tileSize?: number;
 }
 
 /**
@@ -90,10 +91,8 @@ const WmsMapType = function ({
   maxZoom,
   minZoom,
   opacity,
+  tileSize = 256,
 }: WmsMapTypeOptions): google.maps.ImageMapType {
-  // currently only support tileSize of 256
-  const tileSize = new google.maps.Size(256, 256);
-
   const params = {
     layers,
     styles,
@@ -102,8 +101,8 @@ const WmsMapType = function ({
     bgcolor,
     format,
     outline: String(outline),
-    width: String(tileSize.width),
-    height: String(tileSize.height),
+    width: String(tileSize),
+    height: String(tileSize),
     ...DEFAULT_WMS_PARAMS,
   };
 
@@ -115,7 +114,7 @@ const WmsMapType = function ({
     return (
       url +
       new URLSearchParams({
-        bbox: xyzToBounds(coord.x, coord.y, zoom).join(","),
+        bbox: xyzToBounds(coord.x, coord.y, zoom, tileSize).join(","),
         ...params,
       }).toString()
     );
@@ -128,7 +127,7 @@ const WmsMapType = function ({
     opacity,
     maxZoom,
     minZoom,
-    tileSize,
+    tileSize: new google.maps.Size(tileSize, tileSize),
   });
 };
 
