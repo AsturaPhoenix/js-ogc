@@ -14,6 +14,8 @@
  * limitations under the License.
  */
 
+/// <reference types="@types/google.maps" />
+
 /**
  * @ignore
  */
@@ -65,6 +67,8 @@ interface WmsMapTypeOptions {
   transparent?: boolean;
   format?: string;
   outline?: boolean;
+  levelOfDetail?: number; // desired minZoom only for tile data
+  maxOversample?: number; // max difference between zoom and LOD
   name?: string;
   alt?: string;
   minZoom?: number;
@@ -72,64 +76,122 @@ interface WmsMapTypeOptions {
   tileSize?: number;
 }
 
+interface TileData {
+  coord: google.maps.Point;
+  zoom: number;
+}
+
 /**
  *
  * @param {WmsMapTypeOptions} params
  */
-const WmsMapType = function ({
-  url,
-  layers,
-  styles = "",
-  bgcolor = "0xFFFFFF",
-  version = "1.1.1",
-  transparent = true,
-  format = "image/png",
-  outline = false,
-  // google.maps.ImageMapTypeOptions interface
-  name,
-  alt,
-  maxZoom,
-  minZoom,
-  opacity,
-  tileSize = 256,
-}: WmsMapTypeOptions): google.maps.ImageMapType {
-  const params = {
-    layers,
-    styles,
-    version,
-    transparent: String(transparent),
-    bgcolor,
-    format,
-    outline: String(outline),
-    width: String(tileSize),
-    height: String(tileSize),
-    ...DEFAULT_WMS_PARAMS,
-  };
-
-  if (url.slice(-1) !== "?") {
-    url += "?";
+class WmsMapType implements google.maps.MapType {
+  alt: string|null;
+  maxZoom: number;
+  minZoom: number;
+  name: string|null;
+  opacity: number|null;
+  _tileSize: number;
+  get tileSize(): google.maps.Size {
+    return new google.maps.Size(this._tileSize, this._tileSize);
   }
+  projection: null;
+  radius: null;
 
-  const getTileUrl = function (coord: google.maps.Point, zoom: number): string {
-    return (
-      url +
-      new URLSearchParams({
-        bbox: xyzToBounds(coord.x, coord.y, zoom, tileSize).join(","),
-        ...params,
-      }).toString()
-    );
-  };
+  _url: string;
+  get url() {
+    return this._url;
+  }
+  set url(value) {
+    if (value.slice(-1) !== "?") {
+      value += "?";
+    }
+    this._url = value;
+  }
+  levelOfDetail: number;
+  maxOversample: number;
 
-  return new google.maps.ImageMapType({
-    getTileUrl,
+  private readonly params: object;
+  private readonly tiles = new Map<HTMLImageElement, TileData>();
+
+  constructor({
+    url,
+    layers,
+    styles = "",
+    bgcolor = "0xFFFFFF",
+    version = "1.1.1",
+    transparent = true,
+    format = "image/png",
+    outline = false,
+    levelOfDetail = 0,
+    maxOversample = 2,
+    // google.maps.ImageMapTypeOptions interface
     name,
     alt,
-    opacity,
     maxZoom,
     minZoom,
-    tileSize: new google.maps.Size(tileSize, tileSize),
-  });
-};
+    opacity,
+    tileSize = 256,
+  }: WmsMapTypeOptions) {
+    this.params = {
+      layers,
+      styles,
+      version,
+      transparent: String(transparent),
+      bgcolor,
+      format,
+      outline: String(outline),
+      ...DEFAULT_WMS_PARAMS,
+    };
+
+    this.name = name;
+    this.alt = alt;
+    this.opacity = opacity;
+    this.maxZoom = maxZoom;
+    this.minZoom = minZoom;
+    this._tileSize = tileSize;
+    
+    this.url = url;
+    this.levelOfDetail = levelOfDetail;
+    this.maxOversample = maxOversample;
+  }
+
+  getTileUrl(coord: google.maps.Point, zoom: number): string {
+    // To cap the min LOD, we only need to adjust the tile size parameter passed to the tile server.
+    // The zoom and tile size adjustments cancel out for xyzToBounds.
+    const tileSizeParam = String(zoom >= this.levelOfDetail? this._tileSize :
+      (this._tileSize << Math.min(this.levelOfDetail - zoom, this.maxOversample)));
+
+    return (
+      this.url +
+      new URLSearchParams({
+        bbox: xyzToBounds(coord.x, coord.y, zoom, this._tileSize).join(","),
+        ...this.params,
+        width: tileSizeParam,
+        height: tileSizeParam,
+      }).toString()
+    );
+  }
+
+  getTile(coord: google.maps.Point, zoom: number, ownerDocument: Document): Element {
+      const img = ownerDocument.createElement("img");
+      img.src = this.getTileUrl(coord, zoom);
+      img.height = this._tileSize;
+      img.width = this._tileSize;
+      this.tiles.set(img, {coord, zoom});
+      return img;
+  }
+
+  releaseTile(tile: HTMLImageElement): void {
+    this.tiles.delete(tile);
+  }
+
+  refreshTiles(): void {
+    for (const [img, data] of this.tiles) {
+      img.src = this.getTileUrl(data.coord, data.zoom);
+    }
+  }
+}
 
 export {
   EPSG_3857_EXTENT,

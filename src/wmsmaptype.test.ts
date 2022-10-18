@@ -64,17 +64,9 @@ test.each([
       maxZoom: 18,
     },
   ],
-])("WmsMapType can be called with getTIleUrl", (options: WmsMapTypeOptions) => {
-  WmsMapType(options);
-
-  // need to get the mock in order of each
-  const mock = (google.maps.ImageMapType as jest.Mock).mock;
-  const tileUrl = mock.calls[mock.calls.length - 1][0].getTileUrl(
-    new google.maps.Point(0, 0),
-    1,
-    null
-  );
-
+])("WmsMapType can be called with getTileUrl", (options: WmsMapTypeOptions) => {
+  const wmsMapType = new WmsMapType(options);
+  const tileUrl = wmsMapType.getTileUrl(new google.maps.Point(0, 0), 1);
   const [base, queryString] = tileUrl.split("?");
 
   expect(base).toEqual("https://www.mrlc.gov/geoserver/NLCD_Land_Cover/wms");
