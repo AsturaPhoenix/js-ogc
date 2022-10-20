@@ -66,7 +66,7 @@ test.each([
   ],
 ])("WmsMapType can be called with getTileUrl", (options: WmsMapTypeOptions) => {
   const wmsMapType = new WmsMapType(options);
-  const tileUrl = wmsMapType.getTileUrl(new google.maps.Point(0, 0), 1);
+  const tileUrl = wmsMapType.getTileUrl(new google.maps.Point(0, 0), 1, 0);
   const [base, queryString] = tileUrl.split("?");
 
   expect(base).toEqual("https://www.mrlc.gov/geoserver/NLCD_Land_Cover/wms");
