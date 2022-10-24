@@ -335,7 +335,13 @@ class WmsMapType implements google.maps.MapType {
     
     const content: TileContent = [...(fromLarger? [fromLarger] : []), fromSmaller, image];
     content.forEach(e => e.style.position = "absolute");
-    image.decode().then(() => (((this.imageCache[zoom] ??= [])[coord.y] ??= [])[coord.x] ??= [])[lod] = image);
+    image.decode().then(() => {
+      // Hide proxies to prevent antialiasing artifacts that seem to appear otherwise.
+      for (let i = 0; i < content.length - 1; ++i) {
+        content[i].remove();
+      }
+      (((this.imageCache[zoom] ??= [])[coord.y] ??= [])[coord.x] ??= [])[lod] = image;
+    });
     return content;
   }
 
